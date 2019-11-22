@@ -1,5 +1,6 @@
 import os
 import uuid
+import math
 import argparse
 from pathlib import Path
 from typing import List, Tuple, Dict
@@ -33,7 +34,7 @@ APP.add_middleware(
     secret_key="asdjlksd281"
 )
 DATASET = None
-PAIRS_PER_PAGE = 2
+PAIRS_PER_PAGE = 25
 GLOBAL_CACHE = {}
 
 
@@ -59,7 +60,7 @@ def read_root():
 
 
 def find_page_to_annotate(cache_entry: Dict):
-    for page in range(0, len(DATASET), PAIRS_PER_PAGE):
+    for page in range(int(math.ceil(len(DATASET) / PAIRS_PER_PAGE))):
         if page not in cache_entry["submitted"]:
             return page
     return None
@@ -68,6 +69,7 @@ def find_page_to_annotate(cache_entry: Dict):
 @APP.get("/batch/", response_model=BatchForAnnotation)
 def get_batch(request: Request):
     if not request.session or request.session["uid"] not in GLOBAL_CACHE:
+        print("Creating new indices...")
         request.session["uid"] = str(uuid.uuid4())
         indices = np.arange(len(DATASET))
         np.random.shuffle(indices)
@@ -119,6 +121,7 @@ def submit_batch(batch: BatchAnnotated, request: Request):
             message="Indices don't match!"
         )
     batch_orig.loc[indices, "similarity"] = similarities
+    batch_orig["timestamp"] = int(datetime.now().timestamp())
     overwrite = False
     if page in GLOBAL_CACHE[request.session["uid"]]["submitted"]:
         output_path = GLOBAL_CACHE[request.session["uid"]]["submitted"][page]
