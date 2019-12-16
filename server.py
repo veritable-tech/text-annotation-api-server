@@ -19,7 +19,6 @@ PORT = int(os.environ.get("PORT", "8666"))
 OUTPUT_DIR = Path("outputs/")
 APP = FastAPI()
 ORIGINS = [
-    # "http:localhost:3000",
     "*"
 ]
 APP.add_middleware(
@@ -33,9 +32,9 @@ APP.add_middleware(
     SessionMiddleware,
     secret_key="asdjlksd281"
 )
-DATASET = None
+DATASET: pd.DataFrame = pd.DataFrame()
 PAIRS_PER_PAGE = 25
-GLOBAL_CACHE = {}
+GLOBAL_CACHE: Dict = {}
 
 
 class BatchForAnnotation(BaseModel):
@@ -89,7 +88,10 @@ def get_batch(request: Request):
             page*PAIRS_PER_PAGE:(page+1)*PAIRS_PER_PAGE
         ]
     ]
-    pairs = list(batch.itertuples(index=True, name=None))
+    pairs = list(batch[
+        ["text_1", "text_2", "similarity"]
+    ].itertuples(index=True, name=None))
+    print(f"Page: {page} Items: {len(pairs)}")
     return BatchForAnnotation(
         page=page,
         pairs=pairs
@@ -128,7 +130,7 @@ def submit_batch(batch: BatchAnnotated, request: Request):
         overwrite = True
     else:
         output_path = OUTPUT_DIR / \
-            f"{datetime.now().strftime('%Y%m%d_%H%m')}_{page}.csv"
+            f"{datetime.now().strftime('%Y%m%d_%H%M')}_{page}.csv"
         GLOBAL_CACHE[request.session["uid"]]["submitted"][page] = output_path
     batch_orig.to_csv(output_path, index=False)
     return SubmitResult(
